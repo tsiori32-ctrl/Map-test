@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Antananarivo — Carte 3D & Itinéraires</title>
+<meta name="description" content="Carte 3D interactive d'Antananarivo : relief réel, imagerie satellite, points d'intérêt et calcul d'itinéraire.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231B3B2F'/%3E%3Cpath d='M4 42 L20 24 L30 34 L44 16 L60 42 Z' fill='%23D8A94E'/%3E%3C/svg%3E">
+
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl.min.js"></script>
+
+<style>
+  :root{
+    --analamanga: #1B3B2F;
+    --analamanga-deep: #0F2620;
+    --clay: #B5482A;
+    --clay-light: #D0623F;
+    --gold: #D8A94E;
+    --anosy: #3E7C8C;
+    --mist: #F2EFE6;
+    --ink: #10140F;
+    --pharmacy: #4C9A6B;
+    --market: #8B5FA3;
+    --school: #5D7599;
+
+    --font-display: 'Fraunces', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --radius: 14px;
+    --glass-bg: rgba(16, 20, 15, 0.72);
+    --glass-border: rgba(242, 239, 230, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: var(--font-body);
+    background: var(--ink);
+    color: var(--mist);
+    overflow: hidden;
+  }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- HERO ---------- */
+  #hero {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column; justify-content: center;
+    background: radial-gradient(ellipse at 30% 20%, var(--analamanga) 0%, var(--analamanga-deep) 45%, var(--ink) 100%);
+    overflow: hidden;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+  }
+  #hero.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+  #hero svg.contours {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0.5;
+  }
+  #hero svg.contours path {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 1;
+    stroke-dasharray: 2200;
+    stroke-dashoffset: 2200;
+    animation: draw 3.2s ease-out forwards;
+  }
+  #hero svg.contours path:nth-child(2) { stroke: var(--clay-light); animation-delay: 0.15s; }
+  #hero svg.contours path:nth-child(3) { animation-delay: 0.3s; }
+  #hero svg.contours path:nth-child(4) { stroke: var(--anosy); animation-delay: 0.45s; }
+  #hero svg.contours path:nth-child(5) { animation-delay: 0.6s; }
+  #hero svg.contours path:nth-child(6) { stroke: var(--clay-light); animation-delay: 0.75s; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .hero-content {
+    position: relative; z-index: 2;
+    padding: 6vw 8vw;
+    max-width: 720px;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 18px;
+  }
+  .hero-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(48px, 9vw, 96px);
+    line-height: 0.98;
+    margin: 0 0 20px;
+    color: var(--mist);
+  }
+  .hero-title em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--gold);
+  }
+  .hero-sub {
+    font-size: clamp(15px, 1.8vw, 18px);
+    line-height: 1.6;
+    color: rgba(242,239,230,0.78);
+    max-width: 480px;
+    margin: 0 0 36px;
+  }
+  .hero-cta {
+    appearance: none; border: none; cursor: pointer;
+    background: var(--clay);
+    color: var(--mist);
+    font-size: 16px; font-weight: 600;
+    padding: 16px 32px;
+    border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: transform 0.25s ease, background 0.25s ease;
+    box-shadow: 0 8px 30px rgba(181,72,42,0.35);
+  }
+  .hero-cta:hover { background: var(--clay-light); transform: translateY(-2px); }
+  .hero-cta svg { width: 18px; height: 18px; }
+
+  .hero-footnote {
+    position: absolute; bottom: 28px; left: 8vw; right: 8vw;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono); font-size: 11px;
+    color: rgba(242,239,230,0.4); letter-spacing: 0.04em;
+    z-index: 2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #hero svg.contours path { animation: none; stroke-dashoffset: 0; }
+  }
+
+  /* ---------- APP ---------- */
+  #app { position: fixed; inset: 0; }
+  #map { position: absolute; inset: 0; background: var(--ink); }
+
+  #map-loading {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ink);
+    font-family: var(--font-mono); font-size: 13px; color: var(--gold);
+    flex-direction: column; gap: 14px;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+  }
+  #map-loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .spinner {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid rgba(216,169,78,0.25); border-top-color: var(--gold);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+  }
+
+  #top-bar {
+    position: absolute; top: 16px; left: 16px; right: 16px;
+    z-index: 10;
+    display: flex; gap: 10px; align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1 1 280px; min-width: 220px; }
+  #search-input {
+    width: 100%; padding: 13px 44px 13px 16px;
+    border-radius: var(--radius); border: 1px solid var(--glass-border);
+    background: var(--glass-bg); backdrop-filter: blur(14px);
+    color: var(--mist); font-size: 14px;
+  }
+  #search-input::placeholder { color: rgba(242,239,230,0.45); }
+  .search-icon {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; opacity: 0.55; pointer-events: none;
+  }
+  #search-results {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    max-height: 260px; overflow-y: auto;
+    z-index: 20; display: none;
+  }
+  #search-results.show { display: block; }
+  .search-result-item {
+    padding: 11px 16px; font-size: 13.5px; cursor: pointer;
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover, .search-result-item:focus { background: rgba(216,169,78,0.15); }
+  .search-result-name { color: var(--mist); font-weight: 500; }
+  .search-result-type { color: var(--gold); font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; margin-left: 6px; }
+
+  .mode-toggle {
+    display: flex; padding: 4px; gap: 2px;
+    flex: 0 0 auto;
+  }
+  .mode-btn {
+    border: none; background: transparent; color: rgba(242,239,230,0.6);
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap; transition: background 0.2s, color 0.2s;
+  }
+  .mode-btn.active { background: var(--clay); color: var(--mist); }
+
+  .icon-btn {
+    width: 44px; height: 44px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer; color: var(--mist);
+    transition: background 0.2s;
+  }
+  .icon-btn:hover { background: rgba(216,169,78,0.15); }
+  .icon-btn.locating { color: var(--gold); }
+  .icon-btn svg { width: 19px; height: 19px; }
+
+  #chips-row {
+    position: absolute; top: 76px; left: 16px; right: 16px;
+    z-index: 9;
+    display: flex; gap: 8px; overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  #chips-row::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 15px;
+    border-radius: 999px; border: 1px solid var(--glass-border);
+    background: var(--glass-bg); backdrop-filter: blur(14px);
+    color: var(--mist); font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: border-color 0.2s;
+  }
+  .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .chip.active { border-color: var(--chip-color, var(--gold)); background: rgba(216,169,78,0.12); }
+  .chip .chip-spinner {
+    width: 11px; height: 11px; border-radius: 50%;
+    border: 1.5px solid rgba(242,239,230,0.3); border-top-color: var(--mist);
+    animation: spin 0.7s linear infinite; display: none;
+  }
+  .chip.loading .chip-spinner { display: inline-block; }
+  .chip.loading .chip-dot { display: none; }
+
+  #locate-msg {
+    position: absolute; left: 50%; bottom: 84px; z-index: 15;
+    transform: translate(-50%, 12px);
+    max-width: min(420px, calc(100% - 32px));
+    padding: 12px 18px; font-size: 13px; color: var(--mist); text-align: center;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+  }
+  #locate-msg.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); pointer-events: auto; }
+
+  /* POI + landmark markers */
+  .poi-marker {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; cursor: pointer;
+    border: 2px solid rgba(242,239,230,0.85);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .landmark-marker {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--gold); border: 2px solid var(--mist);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; cursor: pointer;
+    box-shadow: 0 2px 10px rgba(216,169,78,0.5);
+  }
+  .user-dot-wrap { width: 22px; height: 22px; position: relative; }
+  .user-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--anosy); border: 3px solid var(--mist);
+    position: absolute; top: 3px; left: 3px; z-index: 2;
+    box-shadow: 0 0 0 3px rgba(62,124,140,0.3);
+  }
+  .user-dot-pulse {
+    position: absolute; inset: -14px; border-radius: 50%;
+    background: rgba(62,124,140,0.35);
+    animation: pulse 2.2s ease-out infinite;
+  }
+  @keyframes pulse {
+    0% { transform: scale(0.3); opacity: 0.8; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .user-dot-pulse { animation: none; opacity: 0.25; } }
+
+  .maplibregl-popup-content {
+    background: var(--glass-bg); backdrop-filter: blur(14px);
+    color: var(--mist); border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    font-family: var(--font-body); padding: 14px 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+  .maplibregl-popup-tip { display: none; }
+  .maplibregl-popup-close-button { color: var(--mist); font-size: 18px; padding: 4px 8px; }
+  .popup-title { font-weight: 600; font-size: 14.5px; margin: 0 0 3px; }
+  .popup-cat { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin: 0 0 12px; }
+  .popup-route-btn {
+    appearance: none; border: none; cursor: pointer; width: 100%;
+    background: var(--clay); color: var(--mist);
+    padding: 9px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  }
+  .popup-route-btn:hover { background: var(--clay-light); }
+
+  /* Route panel */
+  #route-panel {
+    position: absolute; left: 16px; right: 16px; bottom: 16px;
+    z-index: 11; padding: 18px 20px;
+    display: none; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  #route-panel.show { display: flex; }
+  .route-stat { display: flex; flex-direction: column; }
+  .route-stat-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(242,239,230,0.5); }
+  .route-stat-value { font-family: var(--font-mono); font-size: 20px; color: var(--gold); font-weight: 500; }
+  .route-dest { flex: 1 1 160px; min-width: 140px; }
+  .route-dest-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(242,239,230,0.5); margin-bottom: 3px;}
+  .route-dest-name { font-size: 14.5px; font-weight: 600; }
+  #route-close {
+    margin-left: auto; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--glass-border); background: transparent; color: var(--mist);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  }
+  #route-close:hover { background: rgba(216,169,78,0.15); }
+
+  /* Info modal */
+  #info-btn {
+    position: absolute; bottom: 16px; left: 16px; z-index: 10;
+    width: 38px; height: 38px; border-radius: 50%; font-family: var(--font-display);
+    font-style: italic; font-size: 16px;
+  }
+  #info-modal {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(15,38,32,0.55); backdrop-filter: blur(4px);
+    padding: 24px;
+  }
+  #info-modal.show { display: flex; }
+  .modal-card {
+    max-width: 440px; width: 100%; padding: 28px 26px;
+    background: var(--analamanga-deep); border: 1px solid var(--glass-border);
+    border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal-card h3 { font-family: var(--font-display); font-weight: 600; font-size: 22px; margin: 0 0 16px; }
+  .modal-card p { font-size: 13.5px; line-height: 1.65; color: rgba(242,239,230,0.82); margin: 0 0 12px; }
+  .modal-card p strong { color: var(--gold); font-weight: 600; }
+  .modal-close {
+    margin-top: 6px; width: 100%; padding: 12px; border-radius: 10px;
+    border: 1px solid var(--glass-border); background: transparent; color: var(--mist);
+    cursor: pointer; font-size: 13.5px;
+  }
+  .modal-close:hover { background: rgba(216,169,78,0.1); }
+
+  #credit {
+    position: absolute; bottom: 16px; right: 16px; z-index: 10;
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: rgba(242,239,230,0.55);
+    padding: 8px 12px;
+  }
+  #credit b { color: var(--gold); font-weight: 500; }
+
+  @media (max-width: 640px) {
+    #top-bar { top: 12px; left: 10px; right: 10px; }
+    .mode-toggle .mode-btn { padding: 9px 10px; font-size: 12px; }
+    #chips-row { top: 68px; left: 10px; right: 10px; }
+    #route-panel { flex-direction: column; align-items: stretch; gap: 10px; }
+    #route-close { position: absolute; top: 12px; right: 12px; margin: 0; }
+    #credit { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<div id="hero">
+  <svg class="contours" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+    <path d="M -50 520 Q 150 460 300 500 T 600 470 T 1050 510" />
+    <path d="M -50 420 Q 180 340 350 400 T 700 360 T 1050 400" />
+    <path d="M -50 590 Q 220 560 380 590 T 750 570 T 1050 600" />
+    <path d="M -50 320 Q 160 250 330 300 T 660 260 T 1050 300" />
+    <path d="M -50 220 Q 200 160 400 210 T 780 170 T 1050 210" />
+    <path d="M -50 650 Q 250 630 420 650 T 800 640 T 1050 660" />
+  </svg>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Analamanga · 18.88° S, 47.51° E</p>
+    <h1 class="hero-title">Antanan<em>arivo</em><br>en relief</h1>
+    <p class="hero-sub">La ville aux mille collines, vue en 3D réelle : terrain, imagerie satellite récente, votre position — privée et locale — et vos itinéraires, le tout dans le navigateur.</p>
+    <button class="hero-cta" id="hero-enter">
+      Explorer la carte
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+  <div class="hero-footnote">
+    <span>Relief · Satellite · Itinéraires</span>
+    <span>Créé par Tsiory</span>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div id="map"></div>
+
+  <div id="map-loading">
+    <div class="spinner"></div>
+    <span>Chargement du relief…</span>
+  </div>
+
+  <div id="top-bar">
+    <div class="search-wrap">
+      <input id="search-input" type="text" placeholder="Chercher un lieu à Antananarivo…" autocomplete="off">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <div id="search-results" class="glass"></div>
+    </div>
+    <div class="mode-toggle glass">
+      <button class="mode-btn active" data-mode="satellite3d">Satellite 3D</button>
+      <button class="mode-btn" data-mode="plan">Plan</button>
+    </div>
+    <button id="locate-btn" class="icon-btn glass" title="Ma position" aria-label="Ma position">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M22 12h-3M5 12H2"/></svg>
+    </button>
+  </div>
+
+  <div id="chips-row"></div>
+  <div id="locate-msg" class="glass"></div>
+
+  <div id="route-panel" class="glass">
+    <div class="route-dest">
+      <div class="route-dest-label">Destination</div>
+      <div class="route-dest-name" id="route-dest-name">—</div>
+    </div>
+    <div class="route-stat">
+      <div class="route-stat-label">Distance</div>
+      <div class="route-stat-value" id="route-distance">—</div>
+    </div>
+    <div class="route-stat">
+      <div class="route-stat-label">Durée (voiture)</div>
+      <div class="route-stat-value" id="route-duration">—</div>
+    </div>
+    <button id="route-close" aria-label="Fermer l'itinéraire">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <button id="info-btn" class="icon-btn glass" aria-label="À propos des données">i</button>
+  <div id="credit">Carte créée par <b>Tsiory</b> · données © contributeurs OpenStreetMap</div>
+</div>
+
+<div id="info-modal">
+  <div class="modal-card">
+    <h3>À propos de cette carte</h3>
+    <p><strong>Votre position</strong> reste sur votre appareil : elle n'est jamais envoyée à un serveur ni visible par quiconque d'autre.</p>
+    <p><strong>L'imagerie satellite</strong> est la plus récente disponible publiquement, mais n'est pas un flux en direct — aucune carte grand public ne l'est.</p>
+    <p><strong>Les lieux et itinéraires</strong> viennent d'OpenStreetMap, une base de données cartographique libre et communautaire. La couverture peut être incomplète, surtout en périphérie.</p>
+    <button class="modal-close" id="info-close">Fermer</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var ANTANANARIVO = { lat: -18.8792, lon: 47.5079 };
+  var CATEGORIES = {
+    restaurant: { tag: 'amenity', value: 'restaurant', label: 'Restaurants', color: '#B5482A', icon: '🍽️' },
+    hotel:      { tag: 'tourism',  value: 'hotel',      label: 'Hôtels',      color: '#3E7C8C', icon: '🛏️' },
+    pharmacy:   { tag: 'amenity', value: 'pharmacy',   label: 'Pharmacies',  color: '#4C9A6B', icon: '⚕️' },
+    bank:       { tag: 'amenity', value: 'bank',       label: 'Banques',     color: '#D8A94E', icon: '🏦' },
+    market:     { tag: 'amenity', value: 'marketplace',label: 'Marchés',     color: '#8B5FA3', icon: '🧺' },
+    school:     { tag: 'amenity', value: 'school',     label: 'Écoles',      color: '#5D7599', icon: '🏫' }
+  };
+  var LANDMARKS = [
+    { name: 'Rova d\'Antananarivo', lat: -18.9236, lon: 47.5305, icon: '👑' },
+    { name: 'Lac Anosy', lat: -18.9114, lon: 47.5228, icon: '💧' },
+    { name: 'Analakely', lat: -18.9086, lon: 47.5259, icon: '🏙️' },
+    { name: 'Aéroport d\'Ivato', lat: -18.7967, lon: 47.4788, icon: '✈️' }
+  ];
+
+  var map, userLocation = null, userMarker = null, pendingDestination = null;
+  var poiMarkers = {}, activeCategories = {};
+  var routeSourceId = 'route';
+
+  // ---------- Hero ----------
+  document.getElementById('hero-enter').addEventListener('click', function(){
+    document.getElementById('hero').classList.add('hidden');
+    if (map) return;
+    if (typeof maplibregl === 'undefined') {
+      var loading = document.getElementById('map-loading');
+      loading.innerHTML = '<span style="color:#D0623F">La librairie de carte n\'a pas pu se charger. Vérifiez votre connexion, puis rechargez la page.</span>';
+      return;
+    }
+    prepareWorkerAndInit();
+  });
+
+  function prepareWorkerAndInit(){
+    var workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl-csp-worker.min.js';
+    fetch(workerUrl)
+      .then(function(res){ if (!res.ok) throw new Error('worker fetch failed'); return res.text(); })
+      .then(function(code){
+        var blob = new Blob([code], { type: 'text/javascript' });
+        var blobUrl = URL.createObjectURL(blob);
+        if (maplibregl.setWorkerUrl) maplibregl.setWorkerUrl(blobUrl);
+        try { initMap(); } catch (err) { showMapError(err); }
+      })
+      .catch(function(){
+        // Sans le blob local, on tente quand même l'initialisation par défaut
+        try { initMap(); } catch (err) { showMapError(err); }
+      });
+  }
+
+  function showMapError(err){
+    var loading2 = document.getElementById('map-loading');
+    loading2.innerHTML = '<span style="color:#D0623F">Impossible d\'afficher la carte : ' + (err && err.message ? err.message : 'erreur inconnue') + '</span>';
+  }
+
+  // ---------- Map setup ----------
+  function buildStyle(){
+    return {
+      version: 8,
+      sources: {
+        osm: {
+          type: 'raster',
+          tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png','https://b.tile.openstreetmap.org/{z}/{x}/{y}.png','https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
+        },
+        satellite: {
+          type: 'raster',
+          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+          tileSize: 256,
+          attribution: 'Esri, Maxar, Earthstar Geographics'
+        },
+        terrainSource: {
+          type: 'raster-dem',
+          tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'],
+          encoding: 'terrarium',
+          tileSize: 256,
+          maxzoom: 15,
+          attribution: 'Relief © Mapzen, SRTM, OpenStreetMap contributors'
+        }
+      },
+      layers: [
+        { id: 'osm-layer', type: 'raster', source: 'osm', layout: { visibility: 'none' } },
+        { id: 'satellite-layer', type: 'raster', source: 'satellite', layout: { visibility: 'visible' } },
+        { id: 'hillshade-layer', type: 'hillshade', source: 'terrainSource', layout: { visibility: 'visible' },
+          paint: {
+            'hillshade-exaggeration': 0.55,
+            'hillshade-illumination-direction': 315,
+            'hillshade-shadow-color': '#0F2620',
+            'hillshade-highlight-color': '#F2EFE6',
+            'hillshade-accent-color': '#1B3B2F'
+          }
+        }
+      ]
+    };
+  }
+
+  function initMap(){
+    map = new maplibregl.Map({
+      container: 'map',
+      style: buildStyle(),
+      center: [ANTANANARIVO.lon, ANTANANARIVO.lat],
+      zoom: 13,
+      pitch: 60,
+      bearing: -18,
+      antialias: true,
+      attributionControl: { compact: true }
+    });
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+
+    map.on('load', function(){
+      map.addSource(routeSourceId, { type: 'geojson', data: emptyFC() });
+      map.addLayer({
+        id: 'route-line', type: 'line', source: routeSourceId,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#D8A94E', 'line-width': 5, 'line-opacity': 0.92 }
+      });
+      map.setTerrain({ source: 'terrainSource', exaggeration: 1.8 });
+      addLandmarks();
+      buildChips();
+      hideLoading();
+    });
+    map.on('idle', hideLoading);
+    map.on('error', function(e){
+      console.error('Erreur carte:', e && e.error);
+    });
+  }
+
+  function hideLoading(){
+    document.getElementById('map-loading').classList.add('hidden');
+  }
+
+  function emptyFC(){ return { type: 'FeatureCollection', features: [] }; }
+
+  // ---------- Mode toggle ----------
+  document.querySelectorAll('.mode-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.mode-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      setMode(btn.dataset.mode);
+    });
+  });
+
+  function setMode(mode){
+    if (!map) return;
+    if (mode === 'plan') {
+      map.setLayoutProperty('osm-layer', 'visibility', 'visible');
+      map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+      map.setLayoutProperty('hillshade-layer', 'visibility', 'none');
+      map.setTerrain(null);
+      map.easeTo({ pitch: 0, duration: 900 });
+    } else {
+      map.setLayoutProperty('osm-layer', 'visibility', 'none');
+      map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+      map.setLayoutProperty('hillshade-layer', 'visibility', 'visible');
+      map.setTerrain({ source: 'terrainSource', exaggeration: 1.8 });
+      map.easeTo({ pitch: 60, duration: 900 });
+    }
+  }
+
+  // ---------- Landmarks ----------
+  function addLandmarks(){
+    LANDMARKS.forEach(function(lm){
+      var el = document.createElement('div');
+      el.className = 'landmark-marker';
+      el.textContent = lm.icon;
+      var popupEl = buildPopup(lm.name, 'Repère', lm.lat, lm.lon);
+      new maplibregl.Marker({ element: el })
+        .setLngLat([lm.lon, lm.lat])
+        .setPopup(new maplibregl.Popup({ offset: 18 }).setDOMContent(popupEl))
+        .addTo(map);
+    });
+  }
+
+  function buildPopup(name, catLabel, lat, lon){
+    var wrap = document.createElement('div');
+    var title = document.createElement('p'); title.className = 'popup-title'; title.textContent = name;
+    var cat = document.createElement('p'); cat.className = 'popup-cat'; cat.textContent = catLabel;
+    var btn = document.createElement('button'); btn.className = 'popup-route-btn'; btn.textContent = 'Itinéraire jusqu\'ici';
+    btn.addEventListener('click', function(){ startRoute(lat, lon, name); });
+    wrap.appendChild(title); wrap.appendChild(cat); wrap.appendChild(btn);
+    return wrap;
+  }
+
+  // ---------- Category chips + Overpass POIs ----------
+  function buildChips(){
+    var row = document.getElementById('chips-row');
+    row.innerHTML = '';
+    Object.keys(CATEGORIES).forEach(function(key){
+      var cat = CATEGORIES[key];
+      var chip = document.createElement('button');
+      chip.className = 'chip';
+      chip.style.setProperty('--chip-color', cat.color);
+      chip.innerHTML = '<span class="chip-dot" style="background:' + cat.color + '"></span>' +
+                        '<span class="chip-spinner"></span>' +
+                        '<span>' + cat.icon + ' ' + cat.label + '</span>';
+      chip.addEventListener('click', function(){ toggleCategory(key, chip); });
+      row.appendChild(chip);
+    });
+  }
+
+  function toggleCategory(key, chip){
+    if (activeCategories[key]) {
+      activeCategories[key] = false;
+      chip.classList.remove('active');
+      (poiMarkers[key] || []).forEach(function(m){ m.remove(); });
+      poiMarkers[key] = [];
+      return;
+    }
+    activeCategories[key] = true;
+    chip.classList.add('active');
+    chip.classList.add('loading');
+    fetchPOIs(key).then(function(){
+      chip.classList.remove('loading');
+    }).catch(function(){
+      chip.classList.remove('loading');
+      chip.classList.remove('active');
+      activeCategories[key] = false;
+      showLocateMsg('Impossible de charger « ' + CATEGORIES[key].label + ' » pour le moment. Réessayez dans un instant.');
+    });
+  }
+
+  function fetchPOIs(key){
+    var cat = CATEGORIES[key];
+    var b = map.getBounds();
+    var bbox = b.getSouth() + ',' + b.getWest() + ',' + b.getNorth() + ',' + b.getEast();
+    var query = '[out:json][timeout:20];(' +
+      'node["' + cat.tag + '"="' + cat.value + '"](' + bbox + ');' +
+      'way["' + cat.tag + '"="' + cat.value + '"](' + bbox + ');' +
+      ');out center 80;';
+
+    var controller = new AbortController();
+    var timeout = setTimeout(function(){ controller.abort(); }, 20000);
+
+    return fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query),
+      signal: controller.signal
+    }).then(function(res){
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error('overpass error');
+      return res.json();
+    }).then(function(data){
+      var markers = [];
+      (data.elements || []).forEach(function(el){
+        var lat = el.lat || (el.center && el.center.lat);
+        var lon = el.lon || (el.center && el.center.lon);
+        if (!lat || !lon) return;
+        var name = (el.tags && el.tags.name) ? el.tags.name : 'Sans nom';
+        var pin = document.createElement('div');
+        pin.className = 'poi-marker';
+        pin.style.background = cat.color;
+        pin.textContent = cat.icon;
+        var popupEl = buildPopup(name, cat.label, lat, lon);
+        var marker = new maplibregl.Marker({ element: pin })
+          .setLngLat([lon, lat])
+          .setPopup(new maplibregl.Popup({ offset: 16 }).setDOMContent(popupEl))
+          .addTo(map);
+        markers.push(marker);
+      });
+      poiMarkers[key] = markers;
+    });
+  }
+
+  // ---------- Geolocation (local, private) ----------
+  document.getElementById('locate-btn').addEventListener('click', function(){
+    requestGeolocation(true);
+  });
+
+  function requestGeolocation(flyTo){
+    var btn = document.getElementById('locate-btn');
+    btn.classList.add('locating');
+    if (!navigator.geolocation) {
+      showLocateMsg('La géolocalisation n\'est pas disponible sur cet appareil.');
+      btn.classList.remove('locating');
+      return Promise.reject();
+    }
+    return new Promise(function(resolve, reject){
+      navigator.geolocation.getCurrentPosition(function(pos){
+        userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        placeUserMarker();
+        if (flyTo) map.flyTo({ center: [userLocation.lon, userLocation.lat], zoom: 15, pitch: 60, duration: 1400 });
+        btn.classList.remove('locating');
+        hideLocateMsg();
+        resolve(userLocation);
+      }, function(){
+        showLocateMsg('Localisation refusée ou indisponible. Autorisez la localisation dans les réglages de votre navigateur pour l\'utiliser.');
+        btn.classList.remove('locating');
+        reject();
+      }, { enableHighAccuracy: true, timeout: 12000 });
+    });
+  }
+
+  function placeUserMarker(){
+    if (userMarker) userMarker.remove();
+    var el = document.createElement('div');
+    el.className = 'user-dot-wrap';
+    el.innerHTML = '<div class="user-dot-pulse"></div><div class="user-dot"></div>';
+    userMarker = new maplibregl.Marker({ element: el })
+      .setLngLat([userLocation.lon, userLocation.lat])
+      .addTo(map);
+  }
+
+  var locateMsgTimer = null;
+  function showLocateMsg(text){
+    var el = document.getElementById('locate-msg');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(locateMsgTimer);
+    locateMsgTimer = setTimeout(hideLocateMsg, 6000);
+  }
+  function hideLocateMsg(){
+    clearTimeout(locateMsgTimer);
+    document.getElementById('locate-msg').classList.remove('show');
+  }
+
+  // ---------- Routing ----------
+  function startRoute(lat, lon, name){
+    pendingDestination = { lat: lat, lon: lon, name: name };
+    if (userLocation) {
+      computeRoute(userLocation, pendingDestination);
+    } else {
+      showLocateMsg('Localisation en cours pour calculer l\'itinéraire…');
+      requestGeolocation(false).then(function(loc){
+        computeRoute(loc, pendingDestination);
+      }).catch(function(){
+        showLocateMsg('Impossible de calculer l\'itinéraire sans votre position. Autorisez la localisation puis réessayez.');
+      });
+    }
+  }
+
+  function computeRoute(from, to){
+    var url = 'https://router.project-osrm.org/route/v1/driving/' +
+      from.lon + ',' + from.lat + ';' + to.lon + ',' + to.lat +
+      '?overview=full&geometries=geojson';
+    fetch(url).then(function(res){
+      if (!res.ok) throw new Error('osrm error');
+      return res.json();
+    }).then(function(data){
+      if (!data.routes || !data.routes.length) throw new Error('no route');
+      var route = data.routes[0];
+      map.getSource(routeSourceId).setData({
+        type: 'Feature', geometry: route.geometry, properties: {}
+      });
+      showRoutePanel(to.name, route.distance, route.duration);
+      fitRouteBounds(route.geometry);
+    }).catch(function(){
+      showLocateMsg('Le service d\'itinéraire est momentanément indisponible. Réessayez dans un instant.');
+    });
+  }
+
+  function fitRouteBounds(geometry){
+    var coords = geometry.coordinates;
+    var bounds = coords.reduce(function(b, c){ return b.extend(c); }, new maplibregl.LngLatBounds(coords[0], coords[0]));
+    map.fitBounds(bounds, { padding: 80, pitch: 45, duration: 1200 });
+  }
+
+  function showRoutePanel(name, distanceM, durationS){
+    document.getElementById('route-dest-name').textContent = name;
+    document.getElementById('route-distance').textContent = (distanceM / 1000).toFixed(1) + ' km';
+    document.getElementById('route-duration').textContent = Math.round(durationS / 60) + ' min';
+    document.getElementById('route-panel').classList.add('show');
+  }
+
+  document.getElementById('route-close').addEventListener('click', function(){
+    document.getElementById('route-panel').classList.remove('show');
+    if (map && map.getSource(routeSourceId)) map.getSource(routeSourceId).setData(emptyFC());
+    pendingDestination = null;
+  });
+
+  // ---------- Search (Nominatim) ----------
+  var searchTimer = null;
+  var searchInput = document.getElementById('search-input');
+  var searchResults = document.getElementById('search-results');
+
+  searchInput.addEventListener('input', function(){
+    var q = searchInput.value.trim();
+    clearTimeout(searchTimer);
+    if (q.length < 3) { searchResults.classList.remove('show'); return; }
+    searchTimer = setTimeout(function(){ runSearch(q); }, 500);
+  });
+
+  function runSearch(q){
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6' +
+      '&viewbox=47.35,-18.80,47.65,-19.00&bounded=0&q=' + encodeURIComponent(q + ', Antananarivo');
+    fetch(url).then(function(res){ return res.json(); }).then(function(results){
+      renderSearchResults(results || []);
+    }).catch(function(){
+      searchResults.innerHTML = '<div class="search-result-item">Recherche indisponible pour le moment.</div>';
+      searchResults.classList.add('show');
+    });
+  }
+
+  function renderSearchResults(results){
+    searchResults.innerHTML = '';
+    if (!results.length) {
+      searchResults.innerHTML = '<div class="search-result-item">Aucun résultat.</div>';
+      searchResults.classList.add('show');
+      return;
+    }
+    results.forEach(function(r){
+      var item = document.createElement('div');
+      item.className = 'search-result-item';
+      item.setAttribute('role', 'option');
+      item.setAttribute('tabindex', '0');
+      var shortName = r.display_name.split(',').slice(0, 2).join(',');
+      item.innerHTML = '<span class="search-result-name">' + shortName + '</span>' +
+        '<span class="search-result-type">' + (r.type || 'lieu') + '</span>';
+      function selectResult(){
+        map.flyTo({ center: [parseFloat(r.lon), parseFloat(r.lat)], zoom: 16, pitch: 60, duration: 1400 });
+        searchResults.classList.remove('show');
+        searchInput.value = shortName;
+      }
+      item.addEventListener('click', selectResult);
+      item.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectResult(); }
+      });
+      searchResults.appendChild(item);
+    });
+    searchResults.classList.add('show');
+  }
+
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.search-wrap')) searchResults.classList.remove('show');
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    searchResults.classList.remove('show');
+    document.getElementById('info-modal').classList.remove('show');
+    if (document.getElementById('route-panel').classList.contains('show')) {
+      document.getElementById('route-close').click();
+    }
+  });
+
+  // ---------- Info modal ----------
+  document.getElementById('info-btn').addEventListener('click', function(){
+    document.getElementById('info-modal').classList.add('show');
+  });
+  document.getElementById('info-close').addEventListener('click', function(){
+    document.getElementById('info-modal').classList.remove('show');
+  });
+  document.getElementById('info-modal').addEventListener('click', function(e){
+    if (e.target.id === 'info-modal') document.getElementById('info-modal').classList.remove('show');
+  });
+
+})();
+</script>
+</body>
+</html>
