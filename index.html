@@ -410,8 +410,9 @@
       <div id="search-results" class="glass"></div>
     </div>
     <div class="mode-toggle glass">
-      <button class="mode-btn active" data-mode="satellite3d">Satellite 3D</button>
-      <button class="mode-btn" data-mode="plan">Plan</button>
+      <button class="mode-btn" data-mode="plan">Normal</button>
+      <button class="mode-btn" data-mode="satellite">Satellite</button>
+      <button class="mode-btn active" data-mode="satellite3d">3D</button>
     </div>
     <button id="locate-btn" class="icon-btn glass" title="Ma position" aria-label="Ma position">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M22 12h-3M5 12H2"/></svg>
@@ -603,6 +604,12 @@
     if (mode === 'plan') {
       map.setLayoutProperty('osm-layer', 'visibility', 'visible');
       map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+      map.setLayoutProperty('hillshade-layer', 'visibility', 'none');
+      map.setTerrain(null);
+      map.easeTo({ pitch: 0, duration: 900 });
+    } else if (mode === 'satellite') {
+      map.setLayoutProperty('osm-layer', 'visibility', 'none');
+      map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
       map.setLayoutProperty('hillshade-layer', 'visibility', 'none');
       map.setTerrain(null);
       map.easeTo({ pitch: 0, duration: 900 });
